@@ -21,6 +21,7 @@ class DataStore:
         if not os.path.exists(path):
             with open(path, 'w') as _:
                 pass
+        self.recover()
 
     def log(self, line):
         with open(self.path, "a") as f:
@@ -47,23 +48,32 @@ class DataStore:
         # Therefore, to replay, find the last transaction. Then, if it has a COMMIT
         # do nothing. Else, delete all lines after the BEGIN and replay it.
 
-        # Find last begin.
+        # Find last BEGIN.
         last_begin_idx = None
+        last_begin_committed = False
         for idx, line in enumerate(lines):
             if line.startswith(BEGIN):
                 last_begin_idx = idx
-
+                last_begin_committed = False
+            if line.startswith(COMMIT):
+                last_begin_committed = True
+            
         if last_begin_idx == None:
             # Empty file.
             return
         
-        # Truncate at last begin, but include it.
+        if last_begin_committed:
+            # BEGIN is complete.
+            return
+        
+        # Truncate right after last BEGIN line, which is for an incomplete operation.
         lines = lines[:last_begin_idx+1]
 
-        # ID_SEPARATOR our truncated file to a backup location.
-        # Then, atomically move the backup location to the original location.
+        # Write our truncated file to a backup location. If we crash during this,
+        # we can recover since the original location is untouched.
+        # Once done, atomically move the backup location to the original location.
         with open(self.backup_path(), "w") as f:
-            f.writelines([line+NEWLINE for line in lines])
+            f.writelines(lines)
         shutil.move(self.backup_path(), self.path)
 
         # Replay the unfinished BEGIN
@@ -98,7 +108,7 @@ class DataStore:
             line = line.strip()
             if op.id() in line:
                 found_begin_with_oid = True
-            if found_begin_with_oid and line == COMMIT:
+            if found_begin_with_oid and line.startswith(COMMIT):
                 return True
         return False
 
