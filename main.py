@@ -67,16 +67,16 @@ class DataStore:
         shutil.move(self.backup_path(), self.path)
 
         # Replay the unfinished BEGIN
-        oid = lines[last_begin_idx].split()[1:]
+        oid = lines[last_begin_idx].split()[1]
         op = self.parse_op_from_id(oid)
         op.handle(write_begin=False)
 
-    def parse_op_from_oid(self, oid):
-        if id.startswith(MOVE):
+    def parse_op_from_id(self, oid):
+        if oid.startswith(MOVE):
             return MoveOp(self, *oid.split(ID_SEPARATOR)[1:])
-        if id.startswith(WITHDRAW):
+        if oid.startswith(WITHDRAW):
             return WithdrawOp(self, *oid.split(ID_SEPARATOR)[1:])
-        if id.startswith(DEPOSIT):
+        if oid.startswith(DEPOSIT):
             return DepositOp(self, *oid.split(ID_SEPARATOR)[1:])
         raise ValueError(oid)
     
@@ -117,7 +117,7 @@ class WriteLogLine:
         self.amt = amt
     
     def line(self):
-        return f"{self.preamble} {self.dst} {self.amt}\n"
+        return f"{self.preamble} {self.dst} {str(self.amt)}\n"
 
 class ReadLogLine:
     def __init__(self, dst, amt):
@@ -126,7 +126,7 @@ class ReadLogLine:
         self.amt = amt
     
     def line(self):
-        return f"{self.preamble} {self.dst} {self.amt}\n"
+        return f"{self.preamble} {self.dst} {str(self.amt)}\n"
     
 class CommitLogLine:
     def __init__(self, err=None):
@@ -142,10 +142,10 @@ class MoveOp:
         self.ts = ts
         self.src = src
         self.dst = dst
-        self.amt = amt
+        self.amt = int(amt)
     
     def id(self):
-        return ID_SEPARATOR.join([str(x) for x in [MOVE, self.ts, self.src, self.dst, self.amt]])
+        return ID_SEPARATOR.join([str(x) for x in [MOVE, self.ts, self.src, self.dst, str(self.amt)]])
     
     def handle(self, write_begin=True):
         if self.ds.already_committed(self):
@@ -173,10 +173,10 @@ class WithdrawOp:
         self.ds = ds
         self.ts = ts
         self.dst = dst
-        self.amt = amt
+        self.amt = int(amt)
 
     def id(self):
-        return ID_SEPARATOR.join([str(x) for x in [WITHDRAW, self.ts, self.dst, self.amt]])
+        return ID_SEPARATOR.join([str(x) for x in [WITHDRAW, self.ts, self.dst, str(self.amt)]])
     
     def handle(self, write_begin=True):
         if self.ds.already_committed(self):
@@ -197,10 +197,10 @@ class DepositOp:
         self.ds = ds
         self.ts = ts
         self.dst = dst
-        self.amt = amt
+        self.amt = int(amt)
 
     def id(self):
-        return ID_SEPARATOR.join([str(x) for x in [DEPOSIT, self.ts, self.dst, self.amt]])
+        return ID_SEPARATOR.join([str(x) for x in [DEPOSIT, self.ts, self.dst, str(self.amt)]])
 
     def handle(self, write_begin=True):
         if self.ds.already_committed(self):
